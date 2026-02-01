@@ -11,7 +11,12 @@ import { Server } from "socket.io";
 import { mainSocket } from "./socket.js";
 import { interestRouter } from "./routes/interestRouter.js";
 
-dotenv.config();
+const envFile =
+  process.env.NODE_ENV === "production"
+    ? ".env.production"
+    : ".env.dev";
+
+dotenv.config({ path: envFile }); 
 
 const app = express();
 const server= http.createServer(app)
@@ -19,7 +24,7 @@ const io= new Server(server)
 mainSocket(io)
 
 app.use(cors({
-  origin: ['http://localhost:5173','http://localhost:5174',process.env.ClientUrl],
+  origin: ['https://milansangam.com'],
   credentials: true // Required to allow cookies, including HttpOnly cookies
 }));
 

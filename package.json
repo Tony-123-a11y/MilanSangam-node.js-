@@ -1,10 +1,10 @@
 {
-  "name": "jivansathi-backend",
+  "name": "milansangam-backend",
   "version": "1.0.0",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js"
+    "start": "NODE_ENV=production node server.js",
+    "dev": "NODE_ENV=development nodemon server.js"
   },
   "keywords": [],
   "type": "module",
