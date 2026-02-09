@@ -24,7 +24,7 @@ const io= new Server(server)
 mainSocket(io)
 
 app.use(cors({
-  origin: ['https://milansangam.com'],
+  origin: [process.env.ClientUrl],
   credentials: true // Required to allow cookies, including HttpOnly cookies
 }));
 

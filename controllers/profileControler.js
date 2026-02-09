@@ -206,4 +206,6 @@ export const removeShortListProfile = async (req, res) => {
     return res.status(500).json({ success: false, message: "An error occurred while removing the profile from shortlist", error: error.message });
   }
 }
+
+
 export { updateProfile, getUserProfileById };

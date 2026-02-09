@@ -62,18 +62,6 @@ const profileSchema = new mongoose.Schema(
     },
 
     family: {
-      father_name: {
-        type: String,
-      },
-      father_occupation: {
-        type: String,
-      },
-      motherName: {
-        type: String,
-      },
-      motherOccupation: {
-        type: String,
-      },
       noOfSiblings: {
         type: Number,
         min: 0,

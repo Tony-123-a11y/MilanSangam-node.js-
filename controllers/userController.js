@@ -6,6 +6,7 @@ import { validateRegisterUser } from "../validation/validation.js";
 import { Profile } from "../models/profileModel.js";
 import { transformProfilePayload } from "./transformData.js";
 import { json } from "express";
+import mongoose from "mongoose";
 
 export const registerUser = async (req, res) => {
   try {
@@ -354,3 +355,80 @@ export const getUserForAdmin= async(req,res)=>{
       res.status(500).json({success:false,msg:'Internal Server Error'})
     } 
 }
+
+export const getProfileDetails = async(req,res)=>{
+    
+       try {
+          const { uid } = req.params;
+      
+          if (!mongoose.Types.ObjectId.isValid(uid)) {
+            return res
+              .status(400)
+              .json({ success: false, message: "Invalid User ID format" });
+          }
+      
+          const profile = await Profile.findOne({ user: uid }).populate({
+            path: "user",
+            select: "-password -loginOtp -loginOtpExpiry",
+          });
+      
+         
+      
+          if (!profile || !profile.user) {
+            return res
+              .status(404)
+              .json({ success: false, message: "User or Profile not found" });
+          }
+      
+          const user = profile.user;
+      
+          const profileData = {
+            personalInfo: {
+              fullName: user.fullName || "",
+              mobile: user.mobile || "",
+              email: user.email || "",
+              dob: user.dob || "",
+              gender: user.gender || "",
+              religion: user.religion || "",
+              motherTongue: user.motherTongue || "",
+              caste: user.caste || "",
+              subcaste: user.subcaste || "",
+              gothram: user.gothram || "",
+              dosh: user.dosh || "",
+            },
+            education: profile.education || {},
+            career: profile.career || {},
+            about: {
+              description: profile.about?.description || "", // ✅ should be empty string fallback
+              interests: profile.about?.interests || [],
+            },
+            family: profile.family || {},
+            lifeType: profile.lifeType || {},
+            partnerPreferences: profile.partnerPreferences || {
+              ageRange: { min: "", max: "" },
+              heightRange: { min: "", max: "" },
+              maritalStatus: "",
+              religionCaste: { religion: "", caste: "" },
+              education: "",
+              profession: "",
+              location: { country: "", state: "", city: "" },
+              manglikPreference: "",
+              lifestyle: { diet: "", smoking: "", drinking: "" },
+            },
+            profilePic: profile.profilePhotos,
+          };
+      
+          return res.status(200).json({
+            success: true,
+            message: " Profile details fetched successfully",
+            profile: profileData,
+          });
+        } catch (error) {
+          console.error("❌ getUserProfileById Error:", error);
+          return res.status(500).json({
+            success: false,
+            message: "An error occurred while fetching the profile",
+            error: error.message,
+          });
+        }
+      };

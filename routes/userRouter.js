@@ -2,6 +2,7 @@ import express from "express";
 import {
   editProfile,
   forgetPassword,
+  getProfileDetails,
   getUserAfterLogin,
   getUserForAdmin,
   loginUser,
@@ -28,5 +29,5 @@ router.patch('/editProfile', fileUpload.uploadtophotos.array('profilePhotos', 6)
 
 router.get('/getAllUsers',authenticate,getUserForAdmin)
 
-
+router.get('/profileDetails/:uid',getProfileDetails)
 export default router;
