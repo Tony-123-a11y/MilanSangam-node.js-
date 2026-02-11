@@ -250,9 +250,9 @@ export const findMatchesForCurrentUser = async (req, res) => {
     // const filteredResults = results.filter(Boolean);
     // filteredResults.sort((a, b) => b.matchPercentage - a.matchPercentage);
     
-     const userResults= await User.find({}).populate('profile')
-     const finalResults = userResults.map((user)=>{
-          return ProfileDTO(user)
+     const profileResults= await Profile.find({}).populate('user')
+     const finalResults = profileResults.map((profile)=>{
+          return ProfileDTO(profile)
      })
      res.status(200).json({
       success:true,

@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { Profile } from "../models/profileModel.js";
 import { User } from "../models/userModel.js";
 import { transformProfilePayload } from "./transformData.js";
+import { ProfileDTO } from "../DTOs/ProfileDTO.js";
 
 const updateProfile = async (req, res) => {
   try {
@@ -151,7 +152,6 @@ const getUserProfileById = async (req, res) => {
 export const shortListProfile = async (req, res) => {
   try {
     const userId = req.user.userId; 
-    console.log(userId)
     const { matchId } = req.params;
      const findUser= await User.findById(userId);
      if(!findUser){
@@ -172,11 +172,25 @@ export const shortListProfile = async (req, res) => {
 export const getAllShortListProfiles= async(req,res)=>{
   try {
     const userId = req.user.userId; 
-    const findUser= await User.findById(userId).populate({path:'shortProfiles',populate:{path:'user'}});
+    const findUser= await User.findById(userId).populate({
+      path:'shortProfiles',
+      populate:{
+        path:'user'
+      }
+    })
     if(!findUser){
      return res.status(404).json({ success: false, message: "User not found" });
-    }console.log(findUser)
-    const [...shortlistedProfiles]= findUser.shortProfiles;
+    }
+
+    const shortProfiles= findUser.shortProfiles;
+    if(!shortProfiles){
+      return res.status(400).json({success:false, message:'No Shortlisted Profiles found'})
+    }
+
+    const shortlistedProfiles= shortProfiles.map((profile)=>{
+      return ProfileDTO(profile)
+    })
+    
     return res.status(200).json({ success: true, message: "Shortlisted profiles fetched successfully",shortlistedProfiles:shortlistedProfiles });
 }
 catch (error) {
