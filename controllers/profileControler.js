@@ -188,7 +188,8 @@ export const getAllShortListProfiles= async(req,res)=>{
     }
 
     const shortlistedProfiles= shortProfiles.map((profile)=>{
-      return ProfileDTO(profile)
+      const user= profile.user;
+      return ProfileDTO(profile,user)
     })
     
     return res.status(200).json({ success: true, message: "Shortlisted profiles fetched successfully",shortlistedProfiles:shortlistedProfiles });

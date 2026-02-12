@@ -4,6 +4,7 @@ export const ProfileDTO = (profile, user) => {
   return {
     userId: user._id,
     profileId: profile._id,
+    dob:user.dob,
     fullName: user.fullName || "",
     religion: user.religion || "",
     caste: user.caste || "",
