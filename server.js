@@ -23,6 +23,8 @@ const server= http.createServer(app)
 const io= new Server(server)
 mainSocket(io)
 
+console.log(process.env.ClientUrl);
+
 app.use(cors({
   origin: [process.env.ClientUrl],
   credentials: true // Required to allow cookies, including HttpOnly cookies
