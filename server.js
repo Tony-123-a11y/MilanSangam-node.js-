@@ -1,5 +1,5 @@
 import express from "express";
-import http from 'http'
+import http from "http";
 import dotenv from "dotenv";
 import cors from "cors";
 import { connectDB } from "./config/connectDB.js";
@@ -12,42 +12,41 @@ import { mainSocket } from "./socket.js";
 import { interestRouter } from "./routes/interestRouter.js";
 
 const envFile =
-  process.env.NODE_ENV === "production"
-    ? ".env.production"
-    : ".env.dev";
+  process.env.NODE_ENV === "production" ? ".env.production" : ".env.dev";
 
-dotenv.config({ path: envFile }); 
+dotenv.config({ path: envFile });
 
 const app = express();
-const server= http.createServer(app)
-const io= new Server(server)
-mainSocket(io)
+const server = http.createServer(app);
+const io = new Server(server);
+mainSocket(io);
 
 console.log(process.env.ClientUrl);
 
-app.use(cors({
-  origin: [process.env.ClientUrl],
-  credentials: true // Required to allow cookies, including HttpOnly cookies
-}));
+app.use(
+  cors({
+    origin: [process.env.ClientUrl],
+    credentials: true, // Required to allow cookies, including HttpOnly cookies
+  }),
+);
 
-app.use(express.json());  
+app.use(express.json());
 // main server file
-app.use('/uploads', express.static('uploads'));
-
+app.use("/uploads", express.static("uploads"));
 
 app.get("/", (req, res) => {
   res.send("API is running vivah sanyog");
 });
 
-app.get('/health',(req,res)=>{
-  res.json({message:'Health is OK'});
-})
+app.get("/health", (req, res) => {
+  res.json({ message: "Health is OK" });
+});
 
 app.use("/api/users", userRouter);
 app.use("/api/profile", profileRouter);
-app.use("/api/matchprofile",actionRouter);
-app.use('/api/messages',messageRouter);
-app.use('/api/interest',interestRouter);
+app.use("/api/matchprofile", actionRouter);
+app.use("/api/messages", messageRouter);
+app.use("/api/interest", interestRouter);
 
 const PORT = process.env.PORT;
 
@@ -61,5 +60,4 @@ connectDB()
   .catch((error) => {
     console.log(error);
     process.exit(1);
-
   });

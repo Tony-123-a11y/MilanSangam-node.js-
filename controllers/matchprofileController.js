@@ -1,24 +1,33 @@
-import { ProfileDTO } from "../DTOs/ProfileDTO.js";
-import { Profile } from "../models/profileModel.js";
-import { User } from "../models/userModel.js";
 import mongoose from "mongoose";
+import { User } from "../models/userModel.js";
+import { Profile } from "../models/profileModel.js";
+import { ProfileDTO } from "../DTOs/ProfileDTO.js";
 
-// Helper to calculate age
+// Helper: Calculate Age
 const calculateAge = (dob) => {
+  if (!dob) return null;
   const today = new Date();
   const birthDate = new Date(dob);
   let age = today.getFullYear() - birthDate.getFullYear();
   const m = today.getMonth() - birthDate.getMonth();
+
   if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
     age--;
   }
+
   return age;
 };
 
+// Helper: Convert height like 5'11 to inches
 const convertHeightToInches = (heightStr) => {
   if (!heightStr) return null;
-  const feet = Number(heightStr.charAt(0));
-  const inches = Number(heightStr.charAt(2));
+
+  const match = heightStr.match(/(\d+)'(\d+)/);
+  if (!match) return null;
+
+  const feet = parseInt(match[1]);
+  const inches = parseInt(match[2]);
+
   return feet * 12 + inches;
 };
 
@@ -27,247 +36,182 @@ export const findMatchesForCurrentUser = async (req, res) => {
     const { uid } = req.params;
 
     if (!mongoose.Types.ObjectId.isValid(uid)) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Invalid user ID" });
+      return res.status(400).json({
+        success: false,
+        message: "Invalid user ID",
+      });
     }
 
-    const currentUser = await User.findById(uid).populate({ path: "profile" });
+    const currentUser = await User.findById(uid).populate("profile");
 
     if (!currentUser || !currentUser.profile?.partnerPreferences) {
-      return res
-        .status(404)
-        .json({ success: false, message: "User or preferences not found" });
+      return res.status(404).json({
+        success: false,
+        message: "User or partner preferences not found",
+      });
     }
-   
 
-    const {
-      ageRange,
-      heightRange,
-      religionCaste,
-      location,
-      marriageStatus,
-      annualIncome,
-      occupation,
-      motherTongue,
-      physicalDisability,
-      education,
-      community,
-      manglikPreference,
-      lifestyle,
-    } = currentUser.profile.partnerPreferences;
+    const preferences = currentUser.profile.partnerPreferences;
 
-    const query = {};
+    // =============================
+    // STEP 1: BASE FILTER (ONLY GENDER)
+    // =============================
 
-    let dobMin, dobMax;
+    const query = {
+      _id: { $ne: new mongoose.Types.ObjectId(uid) },
+      gender: {
+        $regex:
+          currentUser.gender?.toLowerCase() === "male"
+            ? /^female$/i
+            : /^male$/i,
+      },
+    };
 
-    // Age-based DOB filter
-    if (ageRange?.min && ageRange?.max) {
-      const now = new Date();
-      const currentYear = now.getFullYear();
-      dobMax = new Date(currentYear - ageRange.min, 0, 1);
-      dobMin = new Date(currentYear - ageRange.max - 1, 11, 31);
-      query.dob = { $gte: dobMin, $lte: dobMax };
+
+    const matchedUsers = await User.find(query)
+      .select("-password -loginOtp -loginOtpExpiry")
+      .populate("profile");
+
+    // =============================
+    // STEP 2: SCORING
+    // =============================
+
+    const results = [];
+
+    for (const user of matchedUsers) {
+      if (!user.profile) continue;
+
+      let score = 0;
+      let total = 0;
+
+      const profile = user.profile;
+
+      //  Age Match
+      if (preferences.ageRange?.min && preferences.ageRange?.max && user.dob) {
+        total++;
+        const age = calculateAge(user.dob);
+
+        if (
+          age >= preferences.ageRange.min &&
+          age <= preferences.ageRange.max
+        ) {
+          score++;
+        }
+      }
+
+      // Height Match
+      if (
+        preferences.heightRange?.min &&
+        preferences.heightRange?.max &&
+        user.height
+      ) {
+        total++;
+
+        const userHeight = convertHeightToInches(user.height);
+        const min = convertHeightToInches(preferences.heightRange.min);
+        const max = convertHeightToInches(preferences.heightRange.max);
+
+        if (
+          userHeight &&
+          min &&
+          max &&
+          userHeight >= min &&
+          userHeight <= max
+        ) {
+          score++;
+        }
+      }
+
+      //  Religion
+      if (preferences.religionCaste?.religion && user.religion) {
+        total++;
+        if (
+          user.religion.toLowerCase() ===
+          preferences.religionCaste.religion.toLowerCase()
+        ) {
+          score++;
+        }
+      }
+
+      //  Caste
+      if (preferences.religionCaste?.caste && user.caste) {
+        total++;
+        if (
+          user.caste.toLowerCase() ===
+          preferences.religionCaste.caste.toLowerCase()
+        ) {
+          score++;
+        }
+      }
+
+      //  State
+      if (preferences.location?.state && user.state) {
+        total++;
+        if (
+          user.state.toLowerCase() === preferences.location.state.toLowerCase()
+        ) {
+          score++;
+        }
+      }
+
+      //  City
+      if (preferences.location?.city && user.city) {
+        total++;
+        if (
+          user.city.toLowerCase() === preferences.location.city.toLowerCase()
+        ) {
+          score++;
+        }
+      }
+
+      //  Education
+      if (preferences.education && profile.education?.highestQualification) {
+        total++;
+        if (
+          profile.education.highestQualification.toLowerCase() ===
+          preferences.education.toLowerCase()
+        ) {
+          score++;
+        }
+      }
+
+      //  Occupation
+      if (preferences.occupation && profile.career?.occupation) {
+        total++;
+        if (
+          profile.career.occupation.toLowerCase() ===
+          preferences.occupation.toLowerCase()
+        ) {
+          score++;
+        }
+      }
+
+      const matchPercentage = total ? Math.round((score / total) * 100) : 60;
+
+      const dto = ProfileDTO(profile, user);
+
+      if (dto) {
+        results.push({
+          ...dto,
+          matchPercentage,
+        });
+      }
     }
-   
 
-    // // if (marriageStatus) query.marriageStatus = marriageStatus;
-    // // if (education) query["education.highestQualification"] = education;
+    // Sort highest match first
+    results.sort((a, b) => b.matchPercentage - a.matchPercentage);
 
-    // // // Location filters
-    // // if (location?.country) query["career.location"] = location.country;
-    // // if (location?.state) query["career.state"] = location.state;
-    // // if (location?.city) query["career.city"] = location.city;
-
-    // // Lifestyle filters
-    // // if (lifestyle?.diet) query["lifeType.diet"] = lifestyle.diet;
-    // // if (lifestyle?.smoking) query["lifeType.somking"] = lifestyle.smoking;
-    // // if (lifestyle?.drinking) query["lifeType.drinking"] = lifestyle.drinking;
-
-    // // Religion & Caste
-    // // if (religionCaste?.religion)
-    // //   query["user.religion"] = religionCaste.religion;
-    // // if (religionCaste?.caste) query["user.caste"] = religionCaste.caste;
-
-    // // Manglik preference (assuming you add this field later)
-    // // if (manglikPreference === "Yes" || manglikPreference === "No") {
-    // //   query["religionInfo.manglik"] = manglikPreference; // Note: this field doesn't exist yet
-    // // }
-
-    // // Exclude current user's profile
-    // // query.user = { $ne: new mongoose.Types.ObjectId(uid) };
-
-    // // const candidates = await Profile.find(query).populate({
-    // //   path: "user",
-    // //   select: "-password -loginOtp -loginOtpExpiry",
-    // // });
-
-    // //new aggreation pipeline
-    // // const candidates = await Profile.find({});
-    // // const candidates = await Profile.find({
-    // //   ...query,
-    // //   user: { $ne: new mongoose.Types.ObjectId(uid) }, // exclude current user
-    // // }).populate({
-    // //   path: "user",
-    // //   select: "-password -loginOtp -loginOtpExpiry",
-    // // });
-    // // .aggregate([
-    // //   { $match: query },
-    // //   // {
-    // //   //   $lookup: {
-    // //   //     from: "users",
-    // //   //     localField: "user",
-    // //   //     foreignField: "_id",
-    // //   //     as: "user",
-    // //   //   },
-    // //   // },
-    // //   // { $addFields: { userCount: { $size: "$user" } } },
-    // //   // { $match: { userCount: { $gt: 0 } } }, // make sure join worked
-    // //   // { $unwind: "$user" },
-    // //   // // {
-    // //   // //   // $match: {
-    // //   // //   //   "user._id": { $ne: new mongoose.Types.ObjectId(uid) }
-    // //   // //   // }
-    // //   // // },
-    // //   // { $sort: { createdAt: -1 } },
-    // // ]);
-
-    // const candidates = await Profile.aggregate([
-    //   {
-    //     $lookup: {
-    //       from: "users",
-    //       localField: "user",
-    //       foreignField: "_id",
-    //       as: "user",
-    //     },
-    //   },
-    //   { $unwind: "$user" },
-
-    //   // 🟢 Apply filters on user.dob here
-    //   {
-    //     $match: {
-    //       "user._id": { $ne: new mongoose.Types.ObjectId(uid) },
-    //       "user.dob": { $gte: dobMin, $lte: dobMax },
-    //       ...(currentUser.gender ? {
-    //         "user.gender": currentUser.gender.toLocaleLowerCase() === 'male' ? "Female" : "Male"
-    //       } : {}
-    //       ),
-    //       ...(currentUser.profile.partnerPreferences.marriageStatus ? {
-    //         'user.marriageStatus': currentUser.profile.partnerPreferences.marriageStatus,
-    //       } : {}),
-    //       ...(currentUser.profile.partnerPreferences.religionCaste.religion ? {
-    //         'user.religion': currentUser.profile.partnerPreferences.religionCaste.religion,
-    //       } : {}),
-    //       ...(currentUser.profile.partnerPreferences.location.state ? {
-    //         'user.state': currentUser.profile.partnerPreferences.location.state,
-    //       } : {}),
-    //       ...(currentUser.profile.partnerPreferences.location.city ? {
-    //         'user.city': currentUser.profile.partnerPreferences.location.city,
-    //       } : {}),
-    //       ...(currentUser.profile.partnerPreferences.motherTongue ? {
-    //         'user.motherTongue': currentUser.profile.partnerPreferences.motherTongue,
-    //       } : {}),
-    //       ...(currentUser.profile.partnerPreferences.annualIncome ? {
-    //         'career.annualIncome': currentUser.profile.partnerPreferences.annualIncome,
-    //       } : {}),
-    //       ...(currentUser.profile.partnerPreferences.occupation ? {
-    //         'career.occupation': currentUser.profile.partnerPreferences.occupation,
-    //       } : {}),
-    //       ...(currentUser.profile.partnerPreferences.education ? {
-    //         'career.highestQualification': currentUser.profile.partnerPreferences.education,
-    //       } : {}),
-    //     },
-    //   },
-
-    //   { $sort: { createdAt: -1 } },
-    // ]);
-    // console.log(candidates);
-
-    // // let filteredByHeight = candidates;
-    
-    // // if (heightRange.min && heightRange.max) {
-    // //   console.log("i am here");
-    // //   const minInches = convertHeightToInches(heightRange.min);
-    // //   const maxInches = convertHeightToInches(heightRange.max);
-
-    // //   filteredByHeight = candidates.filter((c) => {
-    // //     console.log("filter height ke andar",c);
-    // //     const userHeight = convertHeightToInches(c.height);
-    // //     console.log("userheight",userHeight);
-    // //     if (!userHeight) return false;
-    // //     return userHeight >= minInches && userHeight <= maxInches;
-    // //   });
-    // // }
-
-    // // console.log("filter bu",filteredByHeight);
-    // const results = candidates.map((candidate) => {
-    //   let score = 0;
-    //   let total = 0;
-    //   const profile = candidate;
-    //   const user = profile.user;
-
-    //   if (!user) return null;
-    //   // Age match
-    //   if (profile.dob && ageRange?.min && ageRange?.max) {
-    //     total++;
-    //     const age = calculateAge(profile.dob);
-    //     if (age >= ageRange.min && age <= ageRange.max) score++;
-    //   }
-
-    //   // Simple equality checks
-    //   const comparisons = [
-    //     [marriageStatus, profile.marriageStatus],
-    //     [religionCaste?.religion, user.religion],
-    //     [religionCaste?.caste, user.caste],
-    //     [education, profile.education?.highestQualification],
-    //     [occupation, profile.career?.occupation],
-    //     [location?.country, profile.career?.location],
-    //     [location?.state, profile.career?.state],
-    //     [location?.city, profile.career?.city],
-    //     [lifestyle?.diet, profile.lifeType?.diet],
-    //     [lifestyle?.smoking, profile.lifeType?.somking],
-    //     [lifestyle?.drinking, profile.lifeType?.drinking],
-    //   ];
-
-    //   comparisons.forEach(([pref, actual]) => {
-    //     if (pref) {
-    //       total++;
-    //       if (pref === actual) score++;
-    //     }
-    //   });
-
-    //   const matchPercentage = total ? Math.round((score / total) * 100) : 0;
-
-    //   return {
-    //     ...candidate,
-    //     user,
-    //     matchPercentage,
-    //   };
-    // });
-
-    // // console.log(results);
-
-    // const filteredResults = results.filter(Boolean);
-    // filteredResults.sort((a, b) => b.matchPercentage - a.matchPercentage);
-    
-     const profileResults= await Profile.find({}).populate('user')
-     const finalResults = profileResults.map((profile)=>{
-          return ProfileDTO(profile)
-     })
-     res.status(200).json({
-      success:true,
-      message:"Matches found",
-      matches:finalResults
-     })
-    // console.log(filteredResults);
-    // res.status(200).json({
-    //   success: true,
-    //   message: "Matches found",
-    //   matches: filteredResults,
-    // });
-    
+    return res.status(200).json({
+      success: true,
+      message: "Matches found successfully",
+      totalMatches: results.length,
+      matches: results,
+    });
   } catch (error) {
-    console.error("Error finding matches:", error);
-    res.status(500).json({ success: false, message: "Server error" });
+    console.error("Match Controller Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while finding matches",
+    });
   }
 };
