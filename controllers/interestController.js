@@ -77,7 +77,6 @@ export const acceptInterest = async (req, res) => {
       });
 
     const sender = await User.findById(senderId).session(session);
-
     const receiver = await User.findById(receiverId).session(session);
 
     if (!sender || !receiver) throw new Error("User not found");
@@ -85,19 +84,16 @@ export const acceptInterest = async (req, res) => {
     if (!receiver.interestsReceived.includes(senderId))
       throw new Error("No pending interest found");
 
-    // Add to matches
-    if (!sender.matches.includes(receiverId)) sender.matches.push(receiverId);
+    // ✅ Add to matches
+    if (!sender.matches.includes(receiverId)) {
+      sender.matches.push(receiverId);
+    }
 
-    if (!receiver.matches.includes(senderId)) receiver.matches.push(senderId);
+    if (!receiver.matches.includes(senderId)) {
+      receiver.matches.push(senderId);
+    }
 
-    // Remove from pending
-    sender.interestsSent = sender.interestsSent.filter(
-      (id) => id.toString() !== receiverId,
-    );
-
-    receiver.interestsReceived = receiver.interestsReceived.filter(
-      (id) => id.toString() !== senderId,
-    );
+    // ❌ DO NOT REMOVE FROM interestsSent / interestsReceived
 
     await sender.save({ session });
     await receiver.save({ session });
@@ -229,7 +225,6 @@ export const getSentInterests = async (req, res) => {
       ...ProfileDTO(user.profile, user),
 
       matchPercentage: calculateMatchPercentage(currentUser, user),
-
     }));
 
     return res.status(200).json({
@@ -263,7 +258,6 @@ export const getReceivedInterests = async (req, res) => {
       ...ProfileDTO(user.profile, user),
 
       matchPercentage: calculateMatchPercentage(currentUser, user),
-
     }));
 
     return res.status(200).json({
