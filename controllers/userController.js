@@ -78,7 +78,7 @@ export const registerUser = async (req, res) => {
     const isMailSent = await sendMail(
       email,
       "Welcome to Vivah Sanyog",
-      welcomeMessage
+      welcomeMessage,
     );
 
     if (isMailSent) {
@@ -91,7 +91,9 @@ export const registerUser = async (req, res) => {
     }
 
     // If mail fails, delete user and inform client
-    await User.findOneAndDelete({ _id: newUser._id });
+
+    await Profile.findByIdAndDelete(profile._id);
+    await User.findByIdAndDelete(newUser._id);
 
     return res.status(400).json({
       message: "Registration failed. Please provide a valid email address.",
@@ -136,11 +138,18 @@ export const loginUser = async (req, res) => {
     const token = jwt.sign(
       { userId: user._id, email: user.email },
       process.env.JWT_SECRET,
-      { expiresIn: "7d" }
+      { expiresIn: "7d" },
     );
-    
 
-    res.status(200).json({
+    // 🔐 Set HTTP-only cookie
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    return res.status(200).json({
       message: "Login successful.",
       token,
       user: {
@@ -185,10 +194,10 @@ export const getUserAfterLogin = async (req, res) => {
         subcaste: user.subcaste || "",
         gothram: user.gothram || "",
         dosh: user.dosh || "",
-        height:user.height || "",
-        marriageStatus:user.marriageStatus || "",
-        state:user.state || "",
-        city:user.city || ""
+        height: user.height || "",
+        marriageStatus: user.marriageStatus || "",
+        state: user.state || "",
+        city: user.city || "",
       },
       education: profile.education || {},
       career: profile.career || {},
@@ -198,7 +207,7 @@ export const getUserAfterLogin = async (req, res) => {
       },
       family: profile.family || {},
       lifeType: profile.lifeType || {},
-      partnerPreferences: profile.partnerPreferences || { 
+      partnerPreferences: profile.partnerPreferences || {
         ageRange: { min: "", max: "" },
         heightRange: { min: "", max: "" },
         maritalStatus: "",
@@ -209,9 +218,10 @@ export const getUserAfterLogin = async (req, res) => {
         manglikPreference: "",
         lifestyle: { diet: "", smoking: "", drinking: "" },
       },
-      profilePic: !profile.profilePhotos?.length<1 ? [...profile.profilePhotos] : [
-        'null','null','null','null','null','null'
-      ]
+      profilePic:
+        !profile.profilePhotos?.length > 0
+          ? [...profile.profilePhotos]
+          : ["null", "null", "null", "null", "null", "null"],
     };
 
     res
@@ -225,29 +235,32 @@ export const getUserAfterLogin = async (req, res) => {
 };
 
 export const editProfile = async (req, res) => {
-
   try {
     const userId = req.user.userId;
     const profilePic = req.profilePic || null;
-     const fileUrls = req.files.map(file => {
-    return `${req.protocol}://${req.get('host')}/uploads/${file.filename}`;
-  });
+    const fileUrls =
+      req.files?.map((file) => {
+        return `${req.protocol}://${req.get("host")}/uploads/${file.filename}`;
+      }) || [];
 
-    const rawFormData = JSON.parse(req.body.formData)
+    const rawFormData = JSON.parse(req.body.formData);
 
     const { userData, profileData } = transformProfilePayload(rawFormData);
 
-    
-    profileData.profilePhotos = [...fileUrls,...req.body.profilePhotos];
+    profileData.profilePhotos = [
+      ...fileUrls,
+      ...(req.body.profilePhotos || []),
+    ];
+
     profileData.user = userId;
-   
+
     const userAck = await User.findByIdAndUpdate(
       userId,
       { $set: userData },
       {
         new: true,
         runValidators: true,
-      }
+      },
     );
     if (!userAck) {
       return res
@@ -257,7 +270,7 @@ export const editProfile = async (req, res) => {
     let profileAck = await Profile.findOneAndUpdate(
       { user: userId },
       { $set: profileData },
-      { new: true, runValidators: true }
+      { new: true, runValidators: true },
     );
 
     // If no profile found, create and link
@@ -342,93 +355,103 @@ export const resetPassword = async (req, res) => {
   }
 };
 
-export const getUserForAdmin= async(req,res)=>{
-    try {
-      const users= await User.find()
-      if(!users){
-        res.status(404).json({success:false,msg:'No users were found',users})
-        return
-      }
-      res.json({success:true,users})
-      
-    } catch (error) {
-      res.status(500).json({success:false,msg:'Internal Server Error'})
-    } 
-}
+export const getUserForAdmin = async (req, res) => {
+  try {
+    const users = await User.find();
+    if (!users) {
+      res
+        .status(404)
+        .json({ success: false, msg: "No users were found", users });
+      return;
+    }
+    res.json({ success: true, users });
+  } catch (error) {
+    res.status(500).json({ success: false, msg: "Internal Server Error" });
+  }
+};
 
-export const getProfileDetails = async(req,res)=>{
-    
-       try {
-          const { uid } = req.params;
-      
-          if (!mongoose.Types.ObjectId.isValid(uid)) {
-            return res
-              .status(400)
-              .json({ success: false, message: "Invalid User ID format" });
-          }
-      
-          const profile = await Profile.findOne({ user: uid }).populate({
-            path: "user",
-            select: "-password -loginOtp -loginOtpExpiry",
-          });
-      
-         
-      
-          if (!profile || !profile.user) {
-            return res
-              .status(404)
-              .json({ success: false, message: "User or Profile not found" });
-          }
-      
-          const user = profile.user;
-      
-          const profileData = {
-            personalInfo: {
-              fullName: user.fullName || "",
-              mobile: user.mobile || "",
-              email: user.email || "",
-              dob: user.dob || "",
-              gender: user.gender || "",
-              religion: user.religion || "",
-              motherTongue: user.motherTongue || "",
-              caste: user.caste || "",
-              subcaste: user.subcaste || "",
-              gothram: user.gothram || "",
-              dosh: user.dosh || "",
-            },
-            education: profile.education || {},
-            career: profile.career || {},
-            about: {
-              description: profile.about?.description || "", // ✅ should be empty string fallback
-              interests: profile.about?.interests || [],
-            },
-            family: profile.family || {},
-            lifeType: profile.lifeType || {},
-            partnerPreferences: profile.partnerPreferences || {
-              ageRange: { min: "", max: "" },
-              heightRange: { min: "", max: "" },
-              maritalStatus: "",
-              religionCaste: { religion: "", caste: "" },
-              education: "",
-              profession: "",
-              location: { country: "", state: "", city: "" },
-              manglikPreference: "",
-              lifestyle: { diet: "", smoking: "", drinking: "" },
-            },
-            profilePic: profile.profilePhotos,
-          };
-      
-          return res.status(200).json({
-            success: true,
-            message: " Profile details fetched successfully",
-            profile: profileData,
-          });
-        } catch (error) {
-          console.error("❌ getUserProfileById Error:", error);
-          return res.status(500).json({
-            success: false,
-            message: "An error occurred while fetching the profile",
-            error: error.message,
-          });
-        }
-      };
+export const getProfileDetails = async (req, res) => {
+  try {
+    const { uid } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(uid)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid User ID format" });
+    }
+
+    const profile = await Profile.findOne({ user: uid }).populate({
+      path: "user",
+      select: "-password -loginOtp -loginOtpExpiry",
+    });
+
+    if (!profile || !profile.user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User or Profile not found" });
+    }
+
+    const user = profile.user;
+
+    const profileData = {
+      personalInfo: {
+        fullName: user.fullName || "",
+        mobile: user.mobile || "",
+        email: user.email || "",
+        dob: user.dob || "",
+        gender: user.gender || "",
+        religion: user.religion || "",
+        motherTongue: user.motherTongue || "",
+        caste: user.caste || "",
+        subcaste: user.subcaste || "",
+        gothram: user.gothram || "",
+        dosh: user.dosh || "",
+      },
+      education: profile.education || {},
+      career: profile.career || {},
+      about: {
+        description: profile.about?.description || "", // ✅ should be empty string fallback
+        interests: profile.about?.interests || [],
+      },
+      family: profile.family || {},
+      lifeType: profile.lifeType || {},
+      partnerPreferences: profile.partnerPreferences || {
+        ageRange: { min: "", max: "" },
+        heightRange: { min: "", max: "" },
+        maritalStatus: "",
+        religionCaste: { religion: "", caste: "" },
+        education: "",
+        profession: "",
+        location: { country: "", state: "", city: "" },
+        manglikPreference: "",
+        lifestyle: { diet: "", smoking: "", drinking: "" },
+      },
+      profilePic: profile.profilePhotos,
+    };
+
+    return res.status(200).json({
+      success: true,
+      message: " Profile details fetched successfully",
+      profile: profileData,
+    });
+  } catch (error) {
+    console.error("❌ getUserProfileById Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "An error occurred while fetching the profile",
+      error: error.message,
+    });
+  }
+};
+
+export const logoutUser = (req, res) => {
+  res.clearCookie("token", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+  });
+
+  return res.status(200).json({
+    message: "Logged out successfully",
+  });
+};

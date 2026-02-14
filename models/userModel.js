@@ -1,28 +1,27 @@
 import mongoose, { Mongoose } from "mongoose";
 import argon2 from "argon2";
 
-
 const userSchema = new mongoose.Schema(
   {
     profile: {
       type: mongoose.Schema.Types.ObjectID,
-      ref: 'Profile'
+      ref: "Profile",
     },
-    isEmailVerified:{
-      type:Boolean,
-      default:false
+    isEmailVerified: {
+      type: Boolean,
+      default: false,
     },
-    height:{
-    type:String,
+    height: {
+      type: String,
     },
-    state:{
-      type:String,
+    state: {
+      type: String,
     },
-    city:{
-      type:String,
+    city: {
+      type: String,
     },
-    marriageStatus:{
-      type:String,
+    marriageStatus: {
+      type: String,
     },
     profileFor: {
       type: String,
@@ -85,40 +84,51 @@ const userSchema = new mongoose.Schema(
       default: "",
       trim: true,
     },
-    shortProfiles:{
-       type:[{
-        type:mongoose.Schema.Types.ObjectId,
-        ref:'Profile'
-       }],
-       
+    shortProfiles: {
+      type: [
+        {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Profile",
+        },
+      ],
     },
-    acceptedProfiles:[
-       {
-        type:mongoose.Schema.Types.ObjectId,
-        ref:'User'
-       }
+    acceptedProfiles: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
     ],
-    rejectedProfiles:[
-       {
-        type:mongoose.Schema.Types.ObjectId,
-        ref:'User'
-       }
+    rejectedProfiles: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
     ],
-   interestsReceived:[
-       {
-        type:mongoose.Schema.Types.ObjectId,
-        ref:'User'
-       }
+    interestsReceived: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        default: [],
+      },
     ],
-   interestsSent:[
-       {
-        type:mongoose.Schema.Types.ObjectId,
-        ref:'User'
-       }
+    interestsSent: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        default: [],
+      },
     ],
-    package:{
-      type:mongoose.Schema.Types.ObjectId,
-      ref:'Package'
+    matches: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        default: [],
+      },
+    ],
+
+    package: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Package",
     },
     loginOtp: {
       type: String,
@@ -134,7 +144,7 @@ const userSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Hash password before saving
@@ -167,5 +177,9 @@ userSchema.set("toObject", { virtuals: true });
 userSchema.methods.verifyPassword = async function (password) {
   return await argon2.verify(this.password, password);
 };
+
+userSchema.index({ interestsSent: 1 });
+userSchema.index({ interestsReceived: 1 });
+userSchema.index({ matches: 1 });
 
 export const User = mongoose.model("User", userSchema);

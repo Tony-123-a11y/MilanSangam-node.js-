@@ -2,6 +2,7 @@ import express from "express";
 import http from "http";
 import dotenv from "dotenv";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import { connectDB } from "./config/connectDB.js";
 import userRouter from "./routes/userRouter.js";
 import profileRouter from "./routes/profileRouter.js";
@@ -29,6 +30,8 @@ app.use(
     credentials: true, // Required to allow cookies, including HttpOnly cookies
   }),
 );
+
+app.use(cookieParser());
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ limit: "10mb", extended: true }));
 app.use("/uploads", express.static("uploads"));

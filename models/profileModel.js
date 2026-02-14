@@ -46,7 +46,6 @@ const profileSchema = new mongoose.Schema(
         // enum: ["Private", "Government", "Business", "Self Employed", "Other"],
         required: false,
       },
-  
     },
 
     about: {
@@ -66,7 +65,7 @@ const profileSchema = new mongoose.Schema(
         type: Number,
         min: 0,
       },
-      familyType: {
+      financialStatus: {
         type: String,
         enum: [
           "Lower Class",
@@ -106,7 +105,7 @@ const profileSchema = new mongoose.Schema(
         min: String, // e.g., "5'3\""
         max: String, // e.g., "5'8\""
       },
-     marriageStatus: {
+      marriageStatus: {
         type: String,
         // enum: ["Never Married", "Divorced", "Widowed", "Separated","Single","Unmarried","Married"],
       },
@@ -125,38 +124,38 @@ const profileSchema = new mongoose.Schema(
         type: String,
         enum: ["Yes", "No", "Doesn't Matter"],
       },
-      motherTongue:{
-        type:String,
+      motherTongue: {
+        type: String,
       },
-      physicalDisability:{
-        type:String,
+      physicalDisability: {
+        type: String,
       },
       lifestyle: {
         diet: String,
         smoking: String,
         drinking: String,
       },
-      annualIncome:{
-        type:String,
+      annualIncome: {
+        type: String,
       },
-      workingStatus:{
-        type:String,
+      workingStatus: {
+        type: String,
       },
-      kids:{
-        type:String,
+      kids: {
+        type: String,
       },
-      community:{
-        type:String,
-      }
-  
+      community: {
+        type: String,
+      },
     },
-  
 
-    profilePhotos: [{
-      type:String,
-    },
-  ]},
-  { timestamps: true }
+    profilePhotos: [
+      {
+        type: String,
+      },
+    ],
+  },
+  { timestamps: true },
 );
 
 export const Profile = mongoose.model("Profile", profileSchema);

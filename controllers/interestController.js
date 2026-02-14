@@ -1,147 +1,279 @@
-import { User } from "../models/userModel.js";
 import mongoose from "mongoose";
+import { User } from "../models/userModel.js";
+import { ProfileDTO } from "../DTOs/ProfileDTO.js";
+import { calculateMatchPercentage } from "../utils/matchCalculator.js";
 
+/**
+ * SEND INTEREST
+ */
 export const sendInterest = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
     const { senderId, receiverId } = req.body;
 
-    if (!senderId || !receiverId) {
-      return res.status(400).json({ success: false, message: "senderId and receiverId are required" });
-    }
+    if (!senderId || !receiverId)
+      return res.status(400).json({
+        success: false,
+        message: "senderId and receiverId required",
+      });
 
-    if (!mongoose.Types.ObjectId.isValid(senderId) || !mongoose.Types.ObjectId.isValid(receiverId)) {
-      return res.status(400).json({ success: false, message: "Invalid user IDs" });
-    }
+    if (senderId === receiverId)
+      return res.status(400).json({
+        success: false,
+        message: "Cannot send interest to yourself",
+      });
 
-    if (senderId === receiverId) {
-      return res.status(400).json({ success: false, message: "You cannot send interest to yourself" });
-    }
+    const sender = await User.findById(senderId).session(session);
 
-    const sender = await User.findById(senderId);
-    const receiver = await User.findById(receiverId);
+    const receiver = await User.findById(receiverId).session(session);
 
-    if (!sender) {
-      return res.status(404).json({ success: false, message: "Sender not found" });
-    }
-    if (!receiver) {
-      return res.status(404).json({ success: false, message: "Receiver not found" });
-    }
+    if (!sender || !receiver) throw new Error("User not found");
 
-    // ✅ Check if interest already sent
-    const alreadySent = sender.interestsSent.includes(receiverId);
-    if (alreadySent) {
-      return res.status(400).json({ success: false, message: "Interest already sent to this user" });
-    }
+    if (sender.matches.includes(receiverId)) throw new Error("Already matched");
 
-    // ✅ Push receiver to sender’s interestsSent
+    if (sender.interestsSent.includes(receiverId))
+      throw new Error("Interest already sent");
+
     sender.interestsSent.push(receiverId);
-
-    // ✅ Push sender to receiver’s interestsReceived
     receiver.interestsReceived.push(senderId);
 
-    await sender.save();
-    await receiver.save();
+    await sender.save({ session });
+    await receiver.save({ session });
+
+    await session.commitTransaction();
 
     return res.status(200).json({
       success: true,
       message: "Interest sent successfully",
     });
   } catch (error) {
-    console.error("Error sending interest:", error);
-    res.status(500).json({ success: false, message: "Internal Server Error" });
+    await session.abortTransaction();
+
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  } finally {
+    session.endSession();
   }
 };
-export const withdrawInterest = async (req, res) => {
+
+/**
+ * ACCEPT INTEREST
+ */
+export const acceptInterest = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
     const { senderId, receiverId } = req.body;
 
-    if (!senderId || !receiverId) {
-      return res.status(400).json({ success: false, message: "senderId and receiverId are required" });
-    }
+    if (!senderId || !receiverId)
+      return res.status(400).json({
+        success: false,
+        message: "senderId and receiverId required",
+      });
 
-    const sender = await User.findById(senderId);
-    const receiver = await User.findById(receiverId);
+    const sender = await User.findById(senderId).session(session);
 
-    if (!sender || !receiver) {
-      return res.status(404).json({ success: false, message: "User not found" });
-    }
+    const receiver = await User.findById(receiverId).session(session);
+
+    if (!sender || !receiver) throw new Error("User not found");
+
+    if (!receiver.interestsReceived.includes(senderId))
+      throw new Error("No pending interest found");
+
+    // Add to matches
+    if (!sender.matches.includes(receiverId)) sender.matches.push(receiverId);
+
+    if (!receiver.matches.includes(senderId)) receiver.matches.push(senderId);
+
+    // Remove from pending
+    sender.interestsSent = sender.interestsSent.filter(
+      (id) => id.toString() !== receiverId,
+    );
+
+    receiver.interestsReceived = receiver.interestsReceived.filter(
+      (id) => id.toString() !== senderId,
+    );
+
+    await sender.save({ session });
+    await receiver.save({ session });
+
+    await session.commitTransaction();
+
+    return res.status(200).json({
+      success: true,
+      message: "Interest accepted. Users matched successfully.",
+    });
+  } catch (error) {
+    await session.abortTransaction();
+
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  } finally {
+    session.endSession();
+  }
+};
+
+/**
+ * REJECT INTEREST
+ */
+export const rejectInterest = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const { senderId, receiverId } = req.body;
+
+    const sender = await User.findById(senderId).session(session);
+
+    const receiver = await User.findById(receiverId).session(session);
+
+    if (!sender || !receiver) throw new Error("User not found");
+
+    receiver.interestsReceived = receiver.interestsReceived.filter(
+      (id) => id.toString() !== senderId,
+    );
 
     sender.interestsSent = sender.interestsSent.filter(
-      (id) => id.toString() !== receiverId
+      (id) => id.toString() !== receiverId,
     );
+
+    await sender.save({ session });
+    await receiver.save({ session });
+
+    await session.commitTransaction();
+
+    return res.status(200).json({
+      success: true,
+      message: "Interest rejected successfully",
+    });
+  } catch (error) {
+    await session.abortTransaction();
+
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  } finally {
+    session.endSession();
+  }
+};
+
+/**
+ * WITHDRAW INTEREST
+ */
+export const withdrawInterest = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const { senderId, receiverId } = req.body;
+
+    const sender = await User.findById(senderId).session(session);
+
+    const receiver = await User.findById(receiverId).session(session);
+
+    if (!sender || !receiver) throw new Error("User not found");
+
+    sender.interestsSent = sender.interestsSent.filter(
+      (id) => id.toString() !== receiverId,
+    );
+
     receiver.interestsReceived = receiver.interestsReceived.filter(
-      (id) => id.toString() !== senderId
+      (id) => id.toString() !== senderId,
     );
 
-    await sender.save();
-    await receiver.save();
+    await sender.save({ session });
+    await receiver.save({ session });
 
-    res.status(200).json({ success: true, message: "Interest withdrawn successfully" });
-  } catch (error) {
-    console.error("Error withdrawing interest:", error);
-    res.status(500).json({ success: false, message: "Internal Server Error" });
-  }
-};
-// ==========================
-// 📤 Get All Interests Sent
-// ==========================
-export const getAllInterestsSent = async (req, res) => {
-  try {
-    const { userId } = req.params;
+    await session.commitTransaction();
 
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return res.status(400).json({ success: false, message: "Invalid user ID" });
-    }
-
-    const user = await User.findById(userId)
-      .populate({
-        path: "interestsSent",
-        select: "fullName gender dob religion caste city state profile",
-        populate: { path: "profile" },
-      })
-      .select("interestsSent");
-
-    if (!user) return res.status(404).json({ success: false, message: "User not found" });
-
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
-      message: "Fetched all interests sent successfully",
-      interestsSent: user.interestsSent,
+      message: "Interest withdrawn successfully",
     });
   } catch (error) {
-    console.error("Error fetching sent interests:", error);
-    res.status(500).json({ success: false, message: "Internal Server Error" });
+    await session.abortTransaction();
+
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  } finally {
+    session.endSession();
   }
 };
 
-// ==========================
-// 📥 Get All Interests Received
-// ==========================
-export const getAllInterestsReceived = async (req, res) => {
+/**
+ * GET SENT INTERESTS
+ */
+export const getSentInterests = async (req, res) => {
   try {
     const { userId } = req.params;
 
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return res.status(400).json({ success: false, message: "Invalid user ID" });
-    }
+    const currentUser = await User.findById(userId).populate("profile");
 
-    const user = await User.findById(userId)
-      .populate({
-        path: "interestsReceived",
-        select: "fullName gender dob religion caste city state profile",
-        populate: { path: "profile" },
-      })
-      .select("interestsReceived");
+    if (!currentUser) throw new Error("User not found");
 
-    if (!user) return res.status(404).json({ success: false, message: "User not found" });
+    const users = await User.find({
+      _id: { $in: currentUser.interestsSent },
+    }).populate("profile");
 
-    res.status(200).json({
+    const results = users.map((user) => ({
+      ...ProfileDTO(user.profile, user),
+
+      matchPercentage: calculateMatchPercentage(currentUser, user),
+
+    }));
+
+    return res.status(200).json({
       success: true,
-      message: "Fetched all interests received successfully",
-      interestsReceived: user.interestsReceived,
+      interests: results,
     });
   } catch (error) {
-    console.error("Error fetching received interests:", error);
-    res.status(500).json({ success: false, message: "Internal Server Error" });
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+/**
+ * GET RECEIVED INTERESTS
+ */
+export const getReceivedInterests = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const currentUser = await User.findById(userId).populate("profile");
+
+    if (!currentUser) throw new Error("User not found");
+
+    const users = await User.find({
+      _id: { $in: currentUser.interestsReceived },
+    }).populate("profile");
+
+    const results = users.map((user) => ({
+      ...ProfileDTO(user.profile, user),
+
+      matchPercentage: calculateMatchPercentage(currentUser, user),
+
+    }));
+
+    return res.status(200).json({
+      success: true,
+      interests: results,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
 };

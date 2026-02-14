@@ -10,10 +10,14 @@ const updateProfile = async (req, res) => {
     const profilePic = req.profilePic;
 
     if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return res.status(400).json({ success: false, message: "Invalid user ID" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid user ID" });
     }
 
-    const { userData, profileData } = transformProfilePayload(req.body.formData);
+    const { userData, profileData } = transformProfilePayload(
+      req.body.formData,
+    );
 
     // Get existing profile to preserve current picture if no new one uploaded
     const existingProfile = await Profile.findOne({ user: userId });
@@ -32,25 +36,31 @@ const updateProfile = async (req, res) => {
     const userAck = await User.findByIdAndUpdate(
       userId,
       { $set: userData },
-      { new: true, runValidators: true }
+      { new: true, runValidators: true },
     );
 
     if (!userAck) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     // ✅ Update or create the Profile document
     let profileAck = await Profile.findOneAndUpdate(
       { user: userId },
       { $set: profileData },
-      { new: true, runValidators: true }
+      { new: true, runValidators: true },
     );
 
     if (!profileAck) {
       const newProfile = new Profile(profileData);
       profileAck = await newProfile.save();
 
-      await User.findByIdAndUpdate(userId, { profile: profileAck._id }, { new: true });
+      await User.findByIdAndUpdate(
+        userId,
+        { profile: profileAck._id },
+        { new: true },
+      );
 
       return res.status(201).json({
         message: "Profile created and linked to user successfully",
@@ -66,7 +76,6 @@ const updateProfile = async (req, res) => {
       success: true,
       data: profileAck,
     });
-
   } catch (error) {
     console.error("Update profile error:", error);
     return res.status(500).json({ message: error.message, success: false });
@@ -87,8 +96,6 @@ const getUserProfileById = async (req, res) => {
       path: "user",
       select: "-password -loginOtp -loginOtpExpiry",
     });
-
-   
 
     if (!profile || !profile.user) {
       return res
@@ -151,76 +158,117 @@ const getUserProfileById = async (req, res) => {
 
 export const shortListProfile = async (req, res) => {
   try {
-    const userId = req.user.userId; 
+    const userId = req.user.userId;
     const { matchId } = req.params;
-     const findUser= await User.findById(userId);
-     if(!findUser){
-      return res.status(404).json({ success: false, message: "User not found" });
-     }
-      if(findUser.shortProfiles.includes(matchId)){
-        return res.status(400).json({ success: false, message: "Profile already shortlisted" });
-      }
+    const findUser = await User.findById(userId);
+    if (!findUser) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
+    }
+    if (findUser.shortProfiles.some((id) => id.toString() === matchId)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Profile already shortlisted" });
+    }
     findUser.shortProfiles.push(matchId);
     await findUser.save();
-    return res.status(200).json({ success: true, message: "Profile shortlisted successfully" });  
+    return res
+      .status(200)
+      .json({ success: true, message: "Profile shortlisted successfully" });
   } catch (error) {
     console.error(" shortListProfile Error:", error);
-    return res.status(500).json({ success: false, message: "An error occurred while shortlisting the profile", error: error.message });
+    return res
+      .status(500)
+      .json({
+        success: false,
+        message: "An error occurred while shortlisting the profile",
+        error: error.message,
+      });
   }
-}
+};
 
-export const getAllShortListProfiles= async(req,res)=>{
+export const getAllShortListProfiles = async (req, res) => {
   try {
-    const userId = req.user.userId; 
-    const findUser= await User.findById(userId).populate({
-      path:'shortProfiles',
-      populate:{
-        path:'user'
-      }
-    })
-    if(!findUser){
-     return res.status(404).json({ success: false, message: "User not found" });
+    const userId = req.user.userId;
+    const findUser = await User.findById(userId).populate({
+      path: "shortProfiles",
+      populate: {
+        path: "user",
+      },
+    });
+    if (!findUser) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
-    const shortProfiles= findUser.shortProfiles;
-    if(!shortProfiles){
-      return res.status(400).json({success:false, message:'No Shortlisted Profiles found'})
+    const shortProfiles = findUser.shortProfiles;
+    if (!shortProfiles) {
+      return res
+        .status(400)
+        .json({ success: false, message: "No Shortlisted Profiles found" });
     }
 
-    const shortlistedProfiles= shortProfiles.map((profile)=>{
-      const user= profile.user;
-      return ProfileDTO(profile,user)
-    })
-    
-    return res.status(200).json({ success: true, message: "Shortlisted profiles fetched successfully",shortlistedProfiles:shortlistedProfiles });
-}
-catch (error) {
+    const shortlistedProfiles = shortProfiles.map((profile) => {
+      const user = profile.user;
+      return ProfileDTO(profile, user);
+    });
+
+    return res
+      .status(200)
+      .json({
+        success: true,
+        message: "Shortlisted profiles fetched successfully",
+        shortlistedProfiles: shortlistedProfiles,
+      });
+  } catch (error) {
     console.error(" getAllShortListProfiles Error:", error);
-    return res.status(500).json({ success: false, message: "An error occurred while fetching shortlisted profiles", error: error.message });
+    return res
+      .status(500)
+      .json({
+        success: false,
+        message: "An error occurred while fetching shortlisted profiles",
+        error: error.message,
+      });
   }
-}
+};
 
 export const removeShortListProfile = async (req, res) => {
   try {
-    const userId = req.user.userId; 
+    const userId = req.user.userId;
     const { matchId } = req.params;
-     const findUser= await User.findById(userId);
-      if(!findUser){
-      return res.status(404).json({ success: false, message: "User not found" });
-     }
-      const index = findUser.shortProfiles.indexOf(matchId);
-      if (index > -1) {
-        findUser.shortProfiles.splice(index, 1);
-        await findUser.save();
-        return res.status(200).json({ success: true, message: "Profile removed from shortlist successfully" });  
-      } else {
-        return res.status(400).json({ success: false, message: "Profile not found in shortlist" });
-      }
-  }catch (error) {
+    const findUser = await User.findById(userId);
+    if (!findUser) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
+    }
+    const index = findUser.shortProfiles.indexOf(matchId);
+    if (index > -1) {
+      findUser.shortProfiles.splice(index, 1);
+      await findUser.save();
+      return res
+        .status(200)
+        .json({
+          success: true,
+          message: "Profile removed from shortlist successfully",
+        });
+    } else {
+      return res
+        .status(400)
+        .json({ success: false, message: "Profile not found in shortlist" });
+    }
+  } catch (error) {
     console.error(" removeShortListProfile Error:", error);
-    return res.status(500).json({ success: false, message: "An error occurred while removing the profile from shortlist", error: error.message });
+    return res
+      .status(500)
+      .json({
+        success: false,
+        message: "An error occurred while removing the profile from shortlist",
+        error: error.message,
+      });
   }
-}
-
+};
 
 export { updateProfile, getUserProfileById };
