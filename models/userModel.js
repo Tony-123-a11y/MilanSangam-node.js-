@@ -4,7 +4,7 @@ import argon2 from "argon2";
 const userSchema = new mongoose.Schema(
   {
     profile: {
-      type: mongoose.Schema.Types.ObjectID,
+      type: mongoose.Schema.Types.ObjectId,
       ref: "Profile",
     },
     isEmailVerified: {

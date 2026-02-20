@@ -33,9 +33,9 @@ export const findMatchesForCurrentUser = async (req, res) => {
         (id) => id.toString() === user._id.toString(),
       );
 
-      // const matched = currentUser.matches.some(
-      //   (id) => id.toString() === user._id.toString()
-      // );
+      const matched = currentUser.matches.some(
+        (id) => id.toString() === user._id.toString()
+      );
 
       const matchPercentage = calculateMatchPercentage(currentUser, user);
 
@@ -44,7 +44,7 @@ export const findMatchesForCurrentUser = async (req, res) => {
         matchPercentage,
         interestSent,
         interestReceived,
-        // matched,
+        matched,
       };
     });
 

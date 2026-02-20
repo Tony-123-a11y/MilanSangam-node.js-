@@ -14,19 +14,12 @@ export const sendInterest = async (req, res) => {
     const { senderId, receiverId } = req.body;
 
     if (!senderId || !receiverId)
-      return res.status(400).json({
-        success: false,
-        message: "senderId and receiverId required",
-      });
+      throw new Error("senderId and receiverId required");
 
     if (senderId === receiverId)
-      return res.status(400).json({
-        success: false,
-        message: "Cannot send interest to yourself",
-      });
+      throw new Error("Cannot send interest to yourself");
 
     const sender = await User.findById(senderId).session(session);
-
     const receiver = await User.findById(receiverId).session(session);
 
     if (!sender || !receiver) throw new Error("User not found");
@@ -44,17 +37,10 @@ export const sendInterest = async (req, res) => {
 
     await session.commitTransaction();
 
-    return res.status(200).json({
-      success: true,
-      message: "Interest sent successfully",
-    });
-  } catch (error) {
+    res.json({ success: true, message: "Interest sent successfully" });
+  } catch (err) {
     await session.abortTransaction();
-
-    return res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+    res.status(500).json({ success: false, message: err.message });
   } finally {
     session.endSession();
   }
@@ -70,52 +56,42 @@ export const acceptInterest = async (req, res) => {
   try {
     const { senderId, receiverId } = req.body;
 
-    if (!senderId || !receiverId)
-      return res.status(400).json({
-        success: false,
-        message: "senderId and receiverId required",
-      });
-
     const sender = await User.findById(senderId).session(session);
     const receiver = await User.findById(receiverId).session(session);
 
     if (!sender || !receiver) throw new Error("User not found");
 
-    if (!receiver.interestsReceived.includes(senderId))
+    if (!receiver.interestsReceived.some((id) => id.toString() === senderId))
       throw new Error("No pending interest found");
 
-    // ✅ Add to matches
-    if (!sender.matches.includes(receiverId)) {
+    if (!sender.matches.some((id) => id.toString() === receiverId)) {
       sender.matches.push(receiverId);
     }
 
-    if (!receiver.matches.includes(senderId)) {
+    if (!receiver.matches.some((id) => id.toString() === senderId)) {
       receiver.matches.push(senderId);
     }
 
-    // ❌ DO NOT REMOVE FROM interestsSent / interestsReceived
+    if (!receiver.acceptedProfiles.some((id) => id.toString() === senderId)) {
+      receiver.acceptedProfiles.push(senderId);
+    }
 
     await sender.save({ session });
     await receiver.save({ session });
 
     await session.commitTransaction();
 
-    return res.status(200).json({
+    res.json({
       success: true,
-      message: "Interest accepted. Users matched successfully.",
+      message: "Interest accepted successfully",
     });
-  } catch (error) {
+  } catch (err) {
     await session.abortTransaction();
-
-    return res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+    res.status(500).json({ success: false, message: err.message });
   } finally {
     session.endSession();
   }
 };
-
 /**
  * REJECT INTEREST
  */
@@ -127,10 +103,12 @@ export const rejectInterest = async (req, res) => {
     const { senderId, receiverId } = req.body;
 
     const sender = await User.findById(senderId).session(session);
-
     const receiver = await User.findById(receiverId).session(session);
 
     if (!sender || !receiver) throw new Error("User not found");
+
+    if (!receiver.interestsReceived.some((id) => id.toString() === senderId))
+      throw new Error("No pending interest found");
 
     receiver.interestsReceived = receiver.interestsReceived.filter(
       (id) => id.toString() !== senderId,
@@ -140,27 +118,26 @@ export const rejectInterest = async (req, res) => {
       (id) => id.toString() !== receiverId,
     );
 
+    if (!receiver.rejectedProfiles.some((id) => id.toString() === senderId)) {
+      receiver.rejectedProfiles.push(senderId);
+    }
+
     await sender.save({ session });
     await receiver.save({ session });
 
     await session.commitTransaction();
 
-    return res.status(200).json({
+    res.json({
       success: true,
       message: "Interest rejected successfully",
     });
-  } catch (error) {
+  } catch (err) {
     await session.abortTransaction();
-
-    return res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+    res.status(500).json({ success: false, message: err.message });
   } finally {
     session.endSession();
   }
 };
-
 /**
  * WITHDRAW INTEREST
  */

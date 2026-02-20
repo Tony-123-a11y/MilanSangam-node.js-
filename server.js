@@ -11,6 +11,7 @@ import messageRouter from "./routes/messageRouter.js";
 import { Server } from "socket.io";
 import { mainSocket } from "./socket.js";
 import { interestRouter } from "./routes/interestRouter.js";
+import profileStatusRouter from "./routes/profileStatusRoutes.js";
 
 const envFile =
   process.env.NODE_ENV === "production" ? ".env.production" : ".env.dev";
@@ -49,7 +50,7 @@ app.use("/api/profile", profileRouter);
 app.use("/api/matchprofile", actionRouter);
 app.use("/api/messages", messageRouter);
 app.use("/api/interest", interestRouter);
-
+app.use("/api/profile-status", profileStatusRouter);
 const PORT = process.env.PORT;
 
 connectDB()
