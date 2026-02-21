@@ -1,10 +1,7 @@
 import express from "express";
 import { authenticate } from "../middlewares/authMiddleware.js";
 import {
-  getAllShortListProfiles,
   getUserProfileById,
-  removeShortListProfile,
-  shortListProfile,
   updateProfile,
 } from "../controllers/profileControler.js";
 import {
@@ -24,18 +21,6 @@ profileRouter.post(
   uploadTopPhotos,
   uploadProfilePic,
   updateProfile,
-);
-
-profileRouter.post("/shortlist/:matchId", authenticate, shortListProfile);
-profileRouter.get(
-  "/allshortlistedprofiles",
-  authenticate,
-  getAllShortListProfiles,
-);
-profileRouter.delete(
-  "/removeshortlist/:matchId",
-  authenticate,
-  removeShortListProfile,
 );
 
 export default profileRouter;

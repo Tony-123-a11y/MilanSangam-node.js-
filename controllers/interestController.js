@@ -1,7 +1,6 @@
 import mongoose from "mongoose";
 import { User } from "../models/userModel.js";
-import { ProfileDTO } from "../DTOs/ProfileDTO.js";
-import { calculateMatchPercentage } from "../utils/matchCalculator.js";
+import { buildProfileResponse } from "../utils/buildProfileResponse.js";
 
 /**
  * SEND INTEREST
@@ -28,6 +27,14 @@ export const sendInterest = async (req, res) => {
 
     if (sender.interestsSent.includes(receiverId))
       throw new Error("Interest already sent");
+
+    sender.rejectedProfiles = sender.rejectedProfiles.filter(
+      (id) => id.toString() !== receiverId,
+    );
+
+    receiver.rejectedProfiles = receiver.rejectedProfiles.filter(
+      (id) => id.toString() !== senderId,
+    );
 
     sender.interestsSent.push(receiverId);
     receiver.interestsReceived.push(senderId);
@@ -64,6 +71,7 @@ export const acceptInterest = async (req, res) => {
     if (!receiver.interestsReceived.some((id) => id.toString() === senderId))
       throw new Error("No pending interest found");
 
+    // match
     if (!sender.matches.some((id) => id.toString() === receiverId)) {
       sender.matches.push(receiverId);
     }
@@ -72,6 +80,7 @@ export const acceptInterest = async (req, res) => {
       receiver.matches.push(senderId);
     }
 
+    // acceptedProfiles
     if (!receiver.acceptedProfiles.some((id) => id.toString() === senderId)) {
       receiver.acceptedProfiles.push(senderId);
     }
@@ -116,6 +125,9 @@ export const rejectInterest = async (req, res) => {
 
     sender.interestsSent = sender.interestsSent.filter(
       (id) => id.toString() !== receiverId,
+    );
+    receiver.acceptedProfiles = receiver.acceptedProfiles.filter(
+      (id) => id.toString() !== senderId,
     );
 
     if (!receiver.rejectedProfiles.some((id) => id.toString() === senderId)) {
@@ -192,17 +204,28 @@ export const getSentInterests = async (req, res) => {
 
     const currentUser = await User.findById(userId).populate("profile");
 
-    if (!currentUser) throw new Error("User not found");
+    if (!currentUser)
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
 
     const users = await User.find({
       _id: { $in: currentUser.interestsSent },
     }).populate("profile");
 
-    const results = users.map((user) => ({
-      ...ProfileDTO(user.profile, user),
+    const results = users.map((user) => {
+      const isAccepted = currentUser.matches.some(
+        (id) => id.toString() === user._id.toString(),
+      );
 
-      matchPercentage: calculateMatchPercentage(currentUser, user),
-    }));
+      return buildProfileResponse(currentUser, user, {
+        interestSent: true,
+        accepted: isAccepted,
+        canSendInterest: false,
+        canAccept: false,
+      });
+    });
 
     return res.status(200).json({
       success: true,
@@ -215,7 +238,6 @@ export const getSentInterests = async (req, res) => {
     });
   }
 };
-
 /**
  * GET RECEIVED INTERESTS
  */
@@ -225,17 +247,28 @@ export const getReceivedInterests = async (req, res) => {
 
     const currentUser = await User.findById(userId).populate("profile");
 
-    if (!currentUser) throw new Error("User not found");
+    if (!currentUser)
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
 
     const users = await User.find({
       _id: { $in: currentUser.interestsReceived },
     }).populate("profile");
 
-    const results = users.map((user) => ({
-      ...ProfileDTO(user.profile, user),
+    const results = users.map((user) => {
+      const isAccepted = currentUser.acceptedProfiles.some(
+        (id) => id.toString() === user._id.toString(),
+      );
 
-      matchPercentage: calculateMatchPercentage(currentUser, user),
-    }));
+      return buildProfileResponse(currentUser, user, {
+        interestReceived: true,
+        accepted: isAccepted,
+        canAccept: !isAccepted,
+        canSendInterest: false,
+      });
+    });
 
     return res.status(200).json({
       success: true,

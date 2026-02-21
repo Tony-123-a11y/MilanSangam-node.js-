@@ -1,6 +1,5 @@
 import { User } from "../models/userModel.js";
-import { ProfileDTO } from "../DTOs/ProfileDTO.js";
-import { calculateMatchPercentage } from "../utils/matchCalculator.js";
+import { buildProfileResponse } from "../utils/buildProfileResponse.js";
 
 export const getAcceptedProfiles = async (req, res) => {
   try {
@@ -18,14 +17,13 @@ export const getAcceptedProfiles = async (req, res) => {
       _id: { $in: currentUser.acceptedProfiles },
     }).populate("profile");
 
-    const results = users.map((user) => ({
-      ...ProfileDTO(user.profile, user),
-      matchPercentage: calculateMatchPercentage(currentUser, user),
-      matched: currentUser.matches.some(
-        (id) => id.toString() === user._id.toString(),
-      ),
-    }));
-
+    const results = users.map((user) =>
+      buildProfileResponse(currentUser, user, {
+        matched: true,
+        canSendInterest: false,
+        canAccept: false,
+      }),
+    );
     return res.status(200).json({
       success: true,
       profiles: results,

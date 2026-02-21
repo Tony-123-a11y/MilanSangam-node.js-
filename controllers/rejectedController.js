@@ -1,6 +1,5 @@
 import { User } from "../models/userModel.js";
-import { ProfileDTO } from "../DTOs/ProfileDTO.js";
-import { calculateMatchPercentage } from "../utils/matchCalculator.js";
+import { buildProfileResponse } from "../utils/buildProfileResponse.js";
 
 export const getRejectedProfiles = async (req, res) => {
   try {
@@ -8,20 +7,24 @@ export const getRejectedProfiles = async (req, res) => {
 
     const currentUser = await User.findById(userId).populate("profile");
 
-    if (!currentUser)
+    if (!currentUser) {
       return res.status(404).json({
         success: false,
         message: "User not found",
       });
+    }
 
     const users = await User.find({
       _id: { $in: currentUser.rejectedProfiles },
     }).populate("profile");
 
-    const results = users.map((user) => ({
-      ...ProfileDTO(user.profile, user),
-      matchPercentage: calculateMatchPercentage(currentUser, user),
-    }));
+    const results = users.map((user) =>
+      buildProfileResponse(currentUser, user, {
+        matched: false,
+        canSendInterest: false,
+        canAccept: false,
+      }),
+    );
 
     return res.status(200).json({
       success: true,

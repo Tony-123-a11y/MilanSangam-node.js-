@@ -12,7 +12,7 @@ import { Server } from "socket.io";
 import { mainSocket } from "./socket.js";
 import { interestRouter } from "./routes/interestRouter.js";
 import profileStatusRouter from "./routes/profileStatusRoutes.js";
-
+import shortlistRouter from "./routes/shortlistRoutes.js";
 const envFile =
   process.env.NODE_ENV === "production" ? ".env.production" : ".env.dev";
 
@@ -47,6 +47,7 @@ app.get("/health", (req, res) => {
 
 app.use("/api/users", userRouter);
 app.use("/api/profile", profileRouter);
+app.use("/api/shortlist", shortlistRouter);
 app.use("/api/matchprofile", actionRouter);
 app.use("/api/messages", messageRouter);
 app.use("/api/interest", interestRouter);
