@@ -218,10 +218,8 @@ export const getUserAfterLogin = async (req, res) => {
         manglikPreference: "",
         lifestyle: { diet: "", smoking: "", drinking: "" },
       },
-      profilePic:
-        !profile.profilePhotos?.length > 0
-          ? [...profile.profilePhotos]
-          : ["null", "null", "null", "null", "null", "null"],
+      profilePhotos:profile.profilePhotos
+         
     };
 
     res
@@ -237,19 +235,19 @@ export const getUserAfterLogin = async (req, res) => {
 export const editProfile = async (req, res) => {
   try {
     const userId = req.user.userId;
-    const profilePic = req.profilePic || null;
     const fileUrls =
       req.files?.map((file) => {
         return `${req.protocol}://${req.get("host")}/uploads/${file.filename}`;
       }) || [];
-
+    
+console.log("fileUrls: ",fileUrls)
     const rawFormData = JSON.parse(req.body.formData);
-
+    // console.log(rawFormData)
     const { userData, profileData } = transformProfilePayload(rawFormData);
-
+   console.log("profilePhotos:" ,profileData.profilePhotos)
     profileData.profilePhotos = [
       ...fileUrls,
-      ...(req.body.profilePhotos || []),
+      ...(profileData.profilePhotos || []),
     ];
 
     profileData.user = userId;

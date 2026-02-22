@@ -11,6 +11,7 @@ export const transformProfilePayload = (formData) => {
     family = {},
     lifeType = {},
     partnerPreferences = {},
+    profilePhotos={},
   } = formData;
 
   const {
@@ -64,6 +65,7 @@ export const transformProfilePayload = (formData) => {
     family,
     lifeType,
     partnerPreferences,
+    profilePhotos,
   };
 
   return { userData, profileData };

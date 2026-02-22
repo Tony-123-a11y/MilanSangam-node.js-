@@ -146,14 +146,13 @@ const profileSchema = new mongoose.Schema(
       },
       community: {
         type: String,
-      },
+      }
     },
 
-    profilePhotos: [
-      {
-        type: String,
-      },
-    ],
+   profilePhotos: {
+  type: [String],
+  default: () => new Array(6).fill(null)
+}
   },
   { timestamps: true },
 );
