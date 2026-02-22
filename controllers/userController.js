@@ -7,6 +7,11 @@ import { Profile } from "../models/profileModel.js";
 import { transformProfilePayload } from "./transformData.js";
 import { json } from "express";
 import mongoose from "mongoose";
+import path from 'path'
+import fs from 'fs';
+import { fileURLToPath } from "url";
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export const registerUser = async (req, res) => {
   try {
@@ -233,6 +238,7 @@ export const getUserAfterLogin = async (req, res) => {
 };
 
 export const editProfile = async (req, res) => {
+  
   try {
     const userId = req.user.userId;
     const fileUrls =
@@ -240,9 +246,9 @@ export const editProfile = async (req, res) => {
         return `${req.protocol}://${req.get("host")}/uploads/${file.filename}`;
       }) || [];
     
-console.log("fileUrls: ",fileUrls)
+
     const rawFormData = JSON.parse(req.body.formData);
-    // console.log(rawFormData)
+  
     const { userData, profileData } = transformProfilePayload(rawFormData);
    console.log("profilePhotos:" ,profileData.profilePhotos)
     profileData.profilePhotos = [
@@ -290,6 +296,96 @@ console.log("fileUrls: ",fileUrls)
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
+
+export const uploadPhoto=async(req,res)=>{
+  try {
+    const userId= req.user.userId;
+    const profile=await Profile.findOne({user:userId})
+
+    if(!profile){
+      return res
+      .status(500)
+      .json({ msg: "User Profile not found", success: false });
+    }
+    const plainProfile = profile.toObject()
+
+    let profilePhotos= plainProfile.profilePhotos;
+ 
+    const index= JSON.parse(req.body.index);
+        const fileUrls =
+      req.files?.map((file) => {
+        return `${req.protocol}://${req.get("host")}/uploads/${file.filename}`;
+      }) || [];
+     
+ 
+    let j=0;
+   for (let i = 0; i < profilePhotos.length && j<fileUrls.length; i++) {
+   if (profilePhotos[i]) continue;
+   profilePhotos[i] = fileUrls[j];
+   j++;
+}
+    profile.profilePhotos=profilePhotos
+    await profile.save();
+    res
+      .status(201)
+      .json({ msg: "Profile uploaded succesfully", success: true });
+     
+  } catch (error) {
+   res
+      .status(500)
+      .json({ msg: "Server error", success: false, error: error.message });
+  }
+  
+}
+
+export const removePhoto=async(req,res)=>{
+try {
+     const userId= req.user.userId;
+     const{index,photoURL}=req.body;
+   const profile= await Profile.findOne({user:userId})
+    if(!profile){
+      return res
+      .status(500)
+      .json({ msg: "User Profile not found", success: false });
+    }
+    // delete url from database array
+   const plainProfile = profile.toObject()
+
+
+    let profilePhotos= plainProfile.profilePhotos;
+  
+
+  profilePhotos[index]=null;
+  profile.profilePhotos=profilePhotos;
+  await profile.save();
+
+
+
+  //Delete file from server
+console.log('__filename: ',__filename)
+  const fileName= path.basename(photoURL);
+  console.log('__dirname: ',__dirname)
+  const filePath= path.join(__dirname,'..','uploads',fileName);
+  console.log('filepath: ',filePath)
+   fs.unlink(filePath,(err)=>{
+       if (err) {
+        // console.log(err)
+            return res.status(500).json({ msg: "Delete failed" });
+        }
+
+        res.json({ msg: "File deleted successfully" });
+   })
+
+    
+} catch (error) {
+    res
+      .status(500)
+      .json({ msg: "Server error", success: false, error: error.message });
+}
+
+    
+    
+}
 
 export const forgetPassword = async (req, res) => {
   const { email } = req.body;
