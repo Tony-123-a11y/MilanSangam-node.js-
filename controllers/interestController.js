@@ -38,13 +38,17 @@ export const sendInterest = async (req, res) => {
 
     sender.interestsSent.push(receiverId);
     receiver.interestsReceived.push(senderId);
-
+    sender.interestSentToday += 1;
     await sender.save({ session });
     await receiver.save({ session });
 
     await session.commitTransaction();
 
-    res.json({ success: true, message: "Interest sent successfully" });
+    res.json({
+      success: true,
+      message: "Interest sent successfully",
+      remaining: limit === -1 ? "Unlimited" : limit - sender.interestSentToday,
+    });
   } catch (err) {
     await session.abortTransaction();
     res.status(500).json({ success: false, message: err.message });

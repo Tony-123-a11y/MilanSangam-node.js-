@@ -130,6 +130,34 @@ const userSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Package",
     },
+
+    packageExpiry: {
+      type: Date,
+    },
+
+    contactViewed: {
+      type: Number,
+      default: 0,
+    },
+
+    interestSentToday: {
+      type: Number,
+      default: 0,
+    },
+
+    messageSentToday: {
+      type: Number,
+      default: 0,
+    },
+
+    lastInterestDate: {
+      type: Date,
+    },
+
+    lastMessageDate: {
+      type: Date,
+    },
+
     loginOtp: {
       type: String,
     },

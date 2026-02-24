@@ -1,9 +1,33 @@
-import express from 'express'
-import { getAllContacts, getAllMessages, sendMessage } from '../controllers/messageController.js'
-import { authenticate } from '../middlewares/authMiddleware.js'
- const messageRouter= express.Router()
+import express from "express";
+import {
+  getAllContacts,
+  getAllMessages,
+  sendMessage,
+} from "../controllers/messageController.js";
+import { authenticate } from "../middlewares/authMiddleware.js";
+import { checkPackageLimit } from "../middlewares/checkPackageLimit.js";
 
-messageRouter.post('/sendMessage/:profileId',authenticate,sendMessage)
-messageRouter.get('/getContacts',authenticate,getAllContacts)
-messageRouter.get('/getMessages/:profileId',authenticate,getAllMessages)
-export default messageRouter
+const messageRouter = express.Router();
+
+messageRouter.post(
+  "/sendMessage/:profileId",
+  authenticate,
+  checkPackageLimit("message"),
+  sendMessage,
+);
+
+messageRouter.get(
+  "/getContacts",
+  authenticate,
+  checkPackageLimit("message"),
+  getAllContacts,
+);
+
+messageRouter.get(
+  "/getMessages/:profileId",
+  authenticate,
+  checkPackageLimit("message"),
+  getAllMessages,
+);
+
+export default messageRouter;

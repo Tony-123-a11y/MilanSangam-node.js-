@@ -1,9 +1,9 @@
+import dotenv from "dotenv";
+import { connectDB } from "./config/connectDB.js";
 import express from "express";
 import http from "http";
-import dotenv from "dotenv";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import { connectDB } from "./config/connectDB.js";
 import userRouter from "./routes/userRouter.js";
 import profileRouter from "./routes/profileRouter.js";
 import actionRouter from "./routes/matchProfileRouter.js";
@@ -13,6 +13,10 @@ import { mainSocket } from "./socket.js";
 import { interestRouter } from "./routes/interestRouter.js";
 import profileStatusRouter from "./routes/profileStatusRoutes.js";
 import shortlistRouter from "./routes/shortlistRoutes.js";
+import packageRouter from "./routes/packageRouter.js";
+import paymentRouter from "./routes/paymentRouter.js";
+import contactRouter from "./routes/contactRouter.js";
+
 const envFile =
   process.env.NODE_ENV === "production" ? ".env.production" : ".env.dev";
 
@@ -52,6 +56,10 @@ app.use("/api/matchprofile", actionRouter);
 app.use("/api/messages", messageRouter);
 app.use("/api/interest", interestRouter);
 app.use("/api/profile-status", profileStatusRouter);
+app.use("/api/packages", packageRouter);
+app.use("/api/payment", paymentRouter);
+app.use("/api/contact", contactRouter);
+
 const PORT = process.env.PORT;
 
 connectDB()
